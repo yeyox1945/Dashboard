@@ -19,10 +19,11 @@ public class DetailsActivity extends AppCompatActivity {
         ArrayList<String> lstPlaces = intent.getStringArrayListExtra("Places");
         ArrayList<String> lstLocations = intent.getStringArrayListExtra("Locations");
         TextView txtDetails = findViewById(R.id.txtDetails);
+        TextView txtLocation = findViewById(R.id.txtLocation);
 
         if (item != -1) {
             txtDetails.setText(lstPlaces.get(item).toString());
-            txtDetails.append(lstLocations.get(item).toString());
+            txtLocation.setText(lstLocations.get(item).toString());
         } else
             txtDetails.setText("Hubo un error :(");
     }
