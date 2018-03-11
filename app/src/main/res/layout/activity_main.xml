@@ -4,6 +4,43 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/actionModeSplitBackground"
     tools:context="com.corpalabs.zubut.dashboard.MainActivity">
 
+    <ListView
+        android:id="@+id/lstvPlaces"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/swpAddLocation" />
+
+    <com.ebanx.swipebtn.SwipeButton
+        android:id="@+id/swpAddLocation"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="50dp"
+        android:layout_marginStart="50dp"
+        android:layout_marginTop="250dp"
+        app:button_background="@drawable/shape_button"
+        app:button_bottom_padding="10dp"
+        app:button_image_disabled="@drawable/ic_close_black_24dp"
+        app:button_image_enabled="@drawable/ic_check_black_24dp"
+        app:button_left_padding="10dp"
+        app:button_right_padding="10dp"
+        app:button_top_padding="10dp"
+        app:inner_text="Agregar ubicacion actual"
+        app:inner_text_background="@drawable/shape_rounded"
+        app:inner_text_bottom_padding="10dp"
+        app:inner_text_color="@android:color/white"
+        app:inner_text_size="16sp"
+        app:inner_text_top_padding="10dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 </android.support.constraint.ConstraintLayout>
