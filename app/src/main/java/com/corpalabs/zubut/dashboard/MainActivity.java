@@ -168,6 +168,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 mMap.clear();
                 final LatLng myLocation = new LatLng(location.getLatitude(), location.getLongitude());
                 mMap.addMarker(new MarkerOptions().position(myLocation).title("Mi ubicacion"));
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(myLocation, 13));
                 swpAddLocation.setEnabled(true);
 
                 swpAddLocation.setOnStateChangeListener(new OnStateChangeListener() {
