@@ -51,7 +51,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks {
+public class MainActivity extends AppCompatActivity implements
+        OnMapReadyCallback,
+        GoogleApiClient.ConnectionCallbacks {
 
     private GoogleMap mMap;
 
@@ -64,6 +66,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     private SharedPreferences sharedPreferences;
 
     private GoogleApiClient mGoogleApiClient;
+    private Location mLocation;
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -88,8 +91,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        Log.d(MainActivity.class.getSimpleName(), "create");
 
         if (mGoogleApiClient == null) {
             mGoogleApiClient = initGoogleApi();
@@ -123,6 +124,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         } catch (Exception e) {
             e.printStackTrace();
         }
+
         adapter = new ArrayAdapter(getApplicationContext(), android.R.layout.simple_list_item_1, lstPlaces);
         lstvPlaces.setAdapter(adapter);
         lstvPlaces.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -136,6 +138,14 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             }
         });
 
+        swpAddLocation.setOnStateChangeListener(new OnStateChangeListener() {
+            @Override
+            public void onStateChange(boolean active) {
+                if (active && mLocation != null) {
+                    saveAdress(mLocation);
+                }
+            }
+        });
     }
 
     @Override
@@ -192,8 +202,6 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         mMap.setMapStyle(nightStyle);
 
-        swpAddLocation.setEnabled(false);
-
         // Validar si el GPS del dispositivo esta activado.
         locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
 
@@ -203,97 +211,42 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
         locationListener = new LocationListener() {
             @Override
-            public void onLocationChanged(Location location) {
-
-                Log.d(MainActivity.class.getSimpleName(), "Location change");
+            public void onLocationChanged(final Location location) {
 
                 // Añadir marcador en mi ubicacion.
                 mMap.clear();
-                final LatLng myLocation = new LatLng(location.getLatitude(), location.getLongitude());
-                mMap.addMarker(new MarkerOptions().position(myLocation).title("Mi ubicacion"));
-                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(myLocation, 13));
-                swpAddLocation.setEnabled(true);
 
-                swpAddLocation.setOnStateChangeListener(new OnStateChangeListener() {
-                    @Override
-                    public void onStateChange(boolean active) {
+                // Añadimos el marcador al mapa
+                addMarker(location, mMap);
 
-                        if (active) {
-                            //Guardar la ubicacion
-                            Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault());
-                            String address = "";
+                // Movemos la camara a la posición
+                setupMap(location, mMap, false);
 
-                            try {
-                                List<Address> addressList = geocoder.getFromLocation(myLocation.latitude, myLocation.longitude, 1);
-                                Log.i("Addresses", addressList.get(0).toString());
-
-                                if (addressList.size() > 0) {
-
-                                    if (addressList.get(0).getThoroughfare() == null) {
-                                        Date currentTime = Calendar.getInstance().getTime();
-                                        address = currentTime.toString();
-                                    } else {
-
-                                        if (addressList.get(0).getAddressLine(0) != null)
-                                            address += addressList.get(0).getAddressLine(0) + " ";
-
-                                        if (addressList.get(0).getAddressLine(1) != null)
-                                            address += addressList.get(0).getAddressLine(1) + " ";
-
-                                        if (addressList.get(0).getAddressLine(2) != null)
-                                            address += addressList.get(0).getAddressLine(2) + " ";
-
-                                        if (addressList.get(0).getAddressLine(3) != null)
-                                            address += addressList.get(0).getAddressLine(3);
-                                    }
-                                }
-
-                                lstPlaces.add(address);
-                                lstLocations.add(myLocation.toString());
-                                Log.i("Address", address);
-
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
-
-                            adapter.notifyDataSetChanged();
-
-                            // Guardar en memoria para almacenamiento permanente.
-                            try {
-                                sharedPreferences.edit().putString("Places", ObjectSerializer.serialize(lstPlaces)).apply();
-                                sharedPreferences.edit().putString("Locations", ObjectSerializer.serialize(lstLocations)).apply();
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
-                            Toast.makeText(MainActivity.this, "Ubicacion guardada", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                });
+                // Guardamos la localización
+                mLocation = location;
             }
 
             @Override
             public void onStatusChanged(String s, int i, Bundle bundle) {
-
+                //TODO
             }
 
             @Override
             public void onProviderEnabled(String s) {
-
+                //TODO
             }
 
             @Override
             public void onProviderDisabled(String s) {
-
+                //TODO
             }
         };
 
         // Checar si hay permisos de utilizar la ubicacion del dispositivo.
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-            Log.d(MainActivity.class.getSimpleName(), "Sin permiso");
         } else {
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
-            Log.d(MainActivity.class.getSimpleName(), "Con permiso");
         }
     }
 
@@ -314,7 +267,11 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     public void onConnected(@Nullable Bundle bundle) {
         try {
             Location location = getLastLocation(mGoogleApiClient);
-            if (location != null ) setupMap(location, mMap, true);
+            if (location != null) {
+                mLocation = location;
+                setupMap(location, mMap, true);
+                addMarker(location, mMap);
+            }
         } catch (Exception e) {
             Log.e(MainActivity.class.getSimpleName(), e.toString());
         }
@@ -337,6 +294,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     /**
+     * Add markers in map
+     *
+     * @param location
+     * @param googleMap
+     */
+    private void addMarker(Location location, GoogleMap googleMap) {
+        LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
+        googleMap.addMarker(new MarkerOptions()
+                .position(latLng)
+                .title(String.format("%s, %s", location.getLatitude(), location.getLongitude()))
+                .visible(true));
+    }
+
+    /**
      * Setup map on location
      *
      * @param location
@@ -351,5 +322,53 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 CameraUpdateFactory.newLatLng(latlng);
 
         googleMap.moveCamera(cameraUpdate);
+    }
+
+    private void saveAdress(Location location) {
+        //Guardar la ubicacion
+        Geocoder geocoder = new Geocoder(getApplicationContext(), Locale.getDefault());
+        String address = "";
+
+        try {
+            List<Address> addressList = geocoder.getFromLocation(location.getLatitude(), location.getLongitude(), 1);
+
+            if (addressList.size() > 0) {
+
+                if (addressList.get(0).getThoroughfare() == null) {
+                    Date currentTime = Calendar.getInstance().getTime();
+                    address = currentTime.toString();
+                } else {
+
+                    if (addressList.get(0).getAddressLine(0) != null)
+                        address += addressList.get(0).getAddressLine(0) + " ";
+
+                    if (addressList.get(0).getAddressLine(1) != null)
+                        address += addressList.get(0).getAddressLine(1) + " ";
+
+                    if (addressList.get(0).getAddressLine(2) != null)
+                        address += addressList.get(0).getAddressLine(2) + " ";
+
+                    if (addressList.get(0).getAddressLine(3) != null)
+                        address += addressList.get(0).getAddressLine(3);
+                }
+            }
+
+            lstPlaces.add(address);
+            lstLocations.add(location.toString());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        adapter.notifyDataSetChanged();
+
+        // Guardar en memoria para almacenamiento permanente.
+        try {
+            sharedPreferences.edit().putString("Places", ObjectSerializer.serialize(lstPlaces)).apply();
+            sharedPreferences.edit().putString("Locations", ObjectSerializer.serialize(lstLocations)).apply();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        Toast.makeText(MainActivity.this, "Ubicacion guardada", Toast.LENGTH_SHORT).show();
     }
 }
