@@ -25,3 +25,7 @@ allprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+ext {
+    servicesVersion = '11.8.0'
+}
