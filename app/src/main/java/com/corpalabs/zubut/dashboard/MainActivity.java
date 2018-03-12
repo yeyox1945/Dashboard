@@ -1,6 +1,7 @@
 package com.corpalabs.zubut.dashboard;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -11,13 +12,14 @@ import android.location.Geocoder;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Bundle;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Menu;
@@ -30,36 +32,38 @@ import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
 
+import com.ebanx.swipebtn.OnStateChangeListener;
+import com.ebanx.swipebtn.SwipeButton;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.MarkerOptions;
 
-import com.ebanx.swipebtn.OnStateChangeListener;
-import com.ebanx.swipebtn.SwipeButton;
-
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-public class MainActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class MainActivity extends AppCompatActivity implements OnMapReadyCallback, GoogleApiClient.ConnectionCallbacks {
 
     private GoogleMap mMap;
 
-    LocationManager locationManager;
-    LocationListener locationListener;
-    ArrayList<String> lstPlaces = new ArrayList<>();
-    ArrayList<String> lstLocations = new ArrayList<>();
-    SwipeButton swpAddLocation;
-    ArrayAdapter<String> adapter;
-    SharedPreferences sharedPreferences;
+    private LocationManager locationManager;
+    private LocationListener locationListener;
+    private ArrayList<String> lstPlaces = new ArrayList<>();
+    private ArrayList<String> lstLocations = new ArrayList<>();
+    private SwipeButton swpAddLocation;
+    private ArrayAdapter<String> adapter;
+    private SharedPreferences sharedPreferences;
+
+    private GoogleApiClient mGoogleApiClient;
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -84,6 +88,12 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        Log.d(MainActivity.class.getSimpleName(), "create");
+
+        if (mGoogleApiClient == null) {
+            mGoogleApiClient = initGoogleApi();
+        }
 
         sharedPreferences = this.getSharedPreferences("com.corpalabs.zubut.dashboard", Context.MODE_PRIVATE);
 
@@ -128,6 +138,20 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
 
     }
 
+    @Override
+    public void onStart() {
+        super.onStart();
+        mGoogleApiClient.connect();
+    }
+
+    @Override
+    public void onStop() {
+        if (mGoogleApiClient != null) {
+            mGoogleApiClient.disconnect();
+        }
+        super.onStop();
+    }
+
     private void alertNoGPS() {
         new AlertDialog.Builder(this).setTitle("GPS apagado")
                 .setIcon(R.drawable.ic_location_off_black_24dp)
@@ -147,22 +171,41 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                 .show();
     }
 
+    /**
+     * Build google API
+     */
+    private GoogleApiClient initGoogleApi() {
+        return new GoogleApiClient
+                .Builder(this)
+                .addConnectionCallbacks(this)
+                .addApi(LocationServices.API)
+                .build();
+    }
+
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
 
+        mGoogleApiClient.connect();
+
         MapStyleOptions nightStyle = MapStyleOptions.loadRawResourceStyle(MainActivity.this, R.raw.night_map);
+
         mMap.setMapStyle(nightStyle);
 
         swpAddLocation.setEnabled(false);
 
         // Validar si el GPS del dispositivo esta activado.
         locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
-        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER))
+
+        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
             alertNoGPS();
+        }
+
         locationListener = new LocationListener() {
             @Override
             public void onLocationChanged(Location location) {
+
+                Log.d(MainActivity.class.getSimpleName(), "Location change");
 
                 // Añadir marcador en mi ubicacion.
                 mMap.clear();
@@ -247,9 +290,10 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         // Checar si hay permisos de utilizar la ubicacion del dispositivo.
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+            Log.d(MainActivity.class.getSimpleName(), "Sin permiso");
         } else {
             locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, locationListener);
-
+            Log.d(MainActivity.class.getSimpleName(), "Con permiso");
         }
     }
 
@@ -265,4 +309,47 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         }
     }
 
+    // Connection callback
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        try {
+            Location location = getLastLocation(mGoogleApiClient);
+            if (location != null ) setupMap(location, mMap, true);
+        } catch (Exception e) {
+            Log.e(MainActivity.class.getSimpleName(), e.toString());
+        }
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        Toast.makeText(this, "Connection fail", Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Get last location
+     *
+     * @param mGoogleApiClient
+     * @return Last location
+     */
+    @SuppressLint("MissingPermission")
+    private Location getLastLocation(GoogleApiClient mGoogleApiClient) {
+        return LocationServices.FusedLocationApi.getLastLocation(mGoogleApiClient);
+    }
+
+    /**
+     * Setup map on location
+     *
+     * @param location
+     * @param googleMap
+     * @param withZoom
+     */
+    private void setupMap(Location location, GoogleMap googleMap, boolean withZoom) {
+        LatLng latlng = new LatLng(location.getLatitude(), location.getLongitude());
+
+        CameraUpdate cameraUpdate = withZoom ?
+                CameraUpdateFactory.newLatLngZoom(latlng, 15) :
+                CameraUpdateFactory.newLatLng(latlng);
+
+        googleMap.moveCamera(cameraUpdate);
+    }
 }
